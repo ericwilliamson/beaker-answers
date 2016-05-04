@@ -57,7 +57,7 @@ module BeakerAnswers
     # @option options [Symbol] :type Should be one of :upgrade or :install.
     # @return [Hash] A hash (keyed from hosts) containing hashes of answer file
     #   data.
-    def self.create version, hosts, options
+    def self.create(version, hosts, options, format = :bash)
 
       # finds all potential version classes
       # discovers new version classes as they are added, no more crazy case statement
@@ -65,7 +65,7 @@ module BeakerAnswers
       version_classes.each do |vc|
         # check to see if the version matches the regex for this class of answers
         if BeakerAnswers.const_get(vc).send(:pe_version_matcher) =~ version
-          return BeakerAnswers.const_get(vc).send(:new, version, hosts, options)
+          return BeakerAnswers.const_get(vc).send(:new, version, hosts, options, format)
         end
       end
       raise NotImplementedError, "Don't know how to generate answers for #{version}"
@@ -97,12 +97,14 @@ module BeakerAnswers
     # @param [Array<Beaker::Host>] hosts An array of host objects.
     # @param [Hash] options options for answer files
     # @option options [Symbol] :type Should be one of :upgrade or :install.
+    # @param [Symbol] :format Should be one of :bash or :hiera.
     # @return [Hash] A hash (keyed from hosts) containing hashes of answer file
     #   data.
-    def initialize(version, hosts, options)
+    def initialize(version, hosts, options, format)
       @version = version
       @hosts = hosts
       @options = options
+      @format = format
     end
 
     # Generate the answers hash based upon version, host and option information
@@ -129,6 +131,21 @@ module BeakerAnswers
     #     create_remote_file host, "/mypath/answer", answers.answer_string(host, answers)
     #  end
     def answer_string(host)
+      answers[host.name].map { |k,v| "#{k}=#{v}" }.join("\n")
+    end
+
+    # This converts a data hash provided by answers, and returns a Puppet
+    # Enterprise compatible answer file ready for use.
+    #
+    # @param [Beaker::Host] host Host object in question to generate the answer
+    #   file for.
+    # @return [String] a string of answers
+    # @example Generating an answer file for a series of hosts
+    #   hosts.each do |host|
+    #     answers = Beaker::Answers.new("2.0", hosts, "master")
+    #     create_remote_file host, "/mypath/answer", answers.answer_string(host, answers)
+    #  end
+    def answer_hiera(host)
       answers[host.name].map { |k,v| "#{k}=#{v}" }.join("\n")
     end
 
